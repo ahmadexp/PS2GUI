@@ -61,6 +61,15 @@ The whole PS2TUI engine (APM / CMOS / SCAMP / PCIC / 8042 / dumps / diagnostics)
 external `PS2TUI.COM` is needed — PS2GUI is self-contained. **Dumps & ROM** also dumps the **CMOS**,
 and the **Start up** boot-order and other advanced settings are exposed as their own tiles.
 
+**Dumps & ROM** additionally offers **Flash BIOS (`!`)** — an in-system reflash of the 96 KB main
+block of the BIOS flash (Intel 28F002BXT) from `C:\PC110ROM.BIN` (the raw `0x20000-0x37FFF` slice of
+a 256 KB image). It reproduces yyzkevin's `vpatch` sequence byte-for-byte (chipset unlock, VPP-enable
+on `port 0x98`, 28F002 erase/program/poll), gated by an **A/C + battery-≥20 % check** and a **DANGER
+confirm**, and touches only the main block so the boot block (reset vector) stays recoverable. Use it
+for e.g. the 28 MB memory-map patch or a TFT video-BIOS. **Reflashing can brick the machine — read
+[`Discovery/BIOS-Flash`](https://github.com/ahmadexp/Open-Source-PC110/blob/main/Discovery/BIOS-Flash/readme.md)
+first, on A/C, with a recovery path.**
+
 ### System Test — including two that talk to the pointing hardware directly
 
 ![System Test grid](screenshot-sub.png)
