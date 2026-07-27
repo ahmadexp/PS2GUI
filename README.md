@@ -70,6 +70,14 @@ for e.g. the 28 MB memory-map patch or a TFT video-BIOS. **Reflashing can brick 
 [`Discovery/BIOS-Flash`](https://github.com/ahmadexp/Open-Source-PC110/blob/main/Discovery/BIOS-Flash/readme.md)
 first, on A/C, with a recovery path.**
 
+It also has **Display: DSTN → TFT** and **Display: TFT → DSTN** — two items that reflash just the
+**video-BIOS panel config** to switch the internal display between the stock passive **DSTN** and an
+active-matrix **TFT** (the 18-byte F65535 flat-panel patch; see
+[`Discovery/65535`](https://github.com/ahmadexp/Open-Source-PC110/blob/main/Discovery/65535/readme.md) §6c).
+**DSTN → TFT** saves the machine's current panel bytes to `C:\PANEL.SAV` before applying the TFT
+values; **TFT → DSTN** restores that backup, so the round-trip is exact and no hard-coded DSTN table
+is needed. Same A/C + battery gate and brick warning; reboot to take effect. **Untested on hardware.**
+
 ### System Test — including two that talk to the pointing hardware directly
 
 ![System Test grid](screenshot-sub.png)
