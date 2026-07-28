@@ -78,6 +78,14 @@ active-matrix **TFT** (the 18-byte F65535 flat-panel patch; see
 values; **TFT → DSTN** restores that backup, so the round-trip is exact and no hard-coded DSTN table
 is needed. Same A/C + battery gate and brick warning; reboot to take effect. **Untested on hardware.**
 
+And **Memory: enable / remove 32 MB patch** — two items that reflash a 17-byte POST memory-sizing
+patch so a PC110 with more than the stock 20 MB (e.g. a 16+16 module) cold-boots cleanly, without the
+RC circuit / `DARK2301` of the classic taka hack (it caps the POST memory count at 28 MB; see
+[`Mods/32MB-Memory-BIOS-Patch`](https://github.com/ahmadexp/Open-Source-PC110/tree/main/Mods/32MB-Memory-BIOS-Patch)).
+Both the patched and original bytes are known exactly, so each direction first **verifies** the BIOS
+is in the expected state and refuses an unexpected/already-in-that-state image — no backup file. Same
+A/C + battery gate and brick warning; only the 96 KB main block is touched. **Untested on hardware.**
+
 ### System Test — including two that talk to the pointing hardware directly
 
 ![System Test grid](screenshot-sub.png)
