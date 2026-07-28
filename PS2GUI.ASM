@@ -150,6 +150,7 @@ R_ACT     equ 2           ; action (no options, just run "PS2 <cmd>")
 R_INFO    equ 3           ; runs "PS2 _@REVision"
 R_CALL    equ 4           ; calls the internal routine at the record's "cmd" field
 R_UITEM   equ 5           ; like R_ITEM but runs C:\ULTRACHG.COM <option> (no cmd word)
+R_FCALL   equ 6           ; flash-gated R_CALL: enabled only when booted from a floppy (VPP present)
 
 ; ---- layout : a framed window floating on a grey desktop, with a drop shadow -
 UI_L      equ 2           ; window left column  (border)
@@ -205,6 +206,17 @@ start:
         mov     ax, 0x4C01        ; abort, exit code 1
         int     0x21
 .hwok:
+        ; flash items are enabled only from a floppy boot (12V VPP interlock,
+        ; Discovery/BIOS-Flash 7)
+        mov     ax, 0x3305         ; DOS 4+ : get boot drive -> DL (1=A: 2=B: ...)
+        int     0x21
+        mov     byte [floppy_boot], 0
+        cmp     dl, 1
+        je      .fdok
+        cmp     dl, 2
+        jne     .fdno
+.fdok:  mov     byte [floppy_boot], 1
+.fdno:
         mov     ax, 0x0012        ; VGA 640x480x16
         int     0x10
         call    set_palette
@@ -477,8 +489,16 @@ g_activate:
         je      .act
         cmp     al, R_INFO
         je      .info
-        mov     ax, [si+2]        ; R_CALL -> self-contained test/report
-        push    ax
+        ; R_CALL / R_FCALL -> self-contained routine on a graphical page.
+        ; A flash-gated (R_FCALL) item with no floppy boot shows need_floppy instead.
+        mov     bx, [si+2]        ; the item's routine
+        cmp     al, R_FCALL
+        jne     .haveh
+        cmp     byte [floppy_boot], 0
+        jne     .haveh
+        mov     bx, need_floppy   ; gated: explain instead of flashing
+.haveh:
+        push    bx
         call    to_text           ; mouse off + mask IRQ12 (8042/keyboard safety)
         mov     ax, 0x0012        ; run it on a GRAPHICAL mauve page (Easy-Setup look)
         int     0x10
@@ -2700,6 +2720,24 @@ dump_cmos:
 ; ============================================================================
 FL_ESEG   equ 0x3000               ; RAM staging: E-bank image (64 KB)
 FL_FSEG   equ 0x4000               ; RAM staging: F-lower image (32 KB)
+
+; need_floppy : shown (on the graphical page) when a flash item is picked
+; without a floppy boot -- flashing needs the 12V VPP that only comes up then.
+need_floppy:
+        mov     si, msg_needfd1
+        call    dump_header
+        mov     dh, 3
+        mov     dl, 0
+        call    gotoxy
+        mov     si, msg_needfd2
+        call    puts_tty
+        mov     dh, 12
+        mov     dl, 0
+        call    gotoxy
+        mov     si, msg_donekey
+        call    puts_hint
+        call    getkey
+        ret
 
 flash_bios:
         mov     si, msg_fltitle
@@ -6404,6 +6442,7 @@ pk_i       dw 0
 tmp_base   dw 0
 fhandle    dw 0
 dseg       dw 0
+floppy_boot db 0          ; 1 if booted from a floppy (flash items enabled)
 dchunks    dw 0
 exec_prog  dw progname            ; program EXEC'd by do_exec (default PS2.EXE)
 show_pfx   dw pfx_ps2             ; confirm-dialog display prefix (default "PS2 ")
@@ -6478,6 +6517,12 @@ cf_title   db "Run this command?",0
 cf_prompt  db "Press Y to run, N to cancel",0
 msg_running db "Running: ",0
 msg_donekey db "--- done.  Press any key to return to PS2TUI ---",0
+msg_needfd1 db "Flashing is disabled",0
+msg_needfd2 db "The BIOS flash 12V (VPP) is only powered when you boot from a",13,10
+            db "floppy in an IBM-marked floppy drive. These items are disabled",13,10
+            db "because this machine was not booted from a floppy. Boot from an",13,10
+            db "IBM DOS floppy, then run this again.",13,10,13,10
+            db "(See Discovery/BIOS-Flash for the hardware VPP interlock.)",0
 crlf       db 13,10,0
 
 ; ---- buffers ----
@@ -6541,11 +6586,11 @@ rows:                     ; pure items, grouped by category (no header rows)
   ROW l_dvbios, dump_vbios, 0, R_CALL
   ROW l_dfont,  dump_font,  0, R_CALL
   ROW l_dcmos,  dump_cmos,  0, R_CALL
-  ROW l_flash,  flash_bios, 0, R_CALL
-  ROW l_ptft,   panel_tft,  0, R_CALL
-  ROW l_pdstn,  panel_dstn, 0, R_CALL
-  ROW l_m32on,  mem32_on,   0, R_CALL
-  ROW l_m32off, mem32_off,  0, R_CALL
+  ROW l_flash,  flash_bios, 0, R_FCALL
+  ROW l_ptft,   panel_tft,  0, R_FCALL
+  ROW l_pdstn,  panel_dstn, 0, R_FCALL
+  ROW l_m32on,  mem32_on,   0, R_FCALL
+  ROW l_m32off, mem32_off,  0, R_FCALL
   ; -- System Test (38..45) --
   ROW l_tmem,   test_mem,   0, R_CALL
   ROW l_tvid,   test_vid,   0, R_CALL

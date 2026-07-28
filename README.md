@@ -78,6 +78,11 @@ active-matrix **TFT** (the 18-byte F65535 flat-panel patch; see
 values; **TFT → DSTN** restores that backup, so the round-trip is exact and no hard-coded DSTN table
 is needed. Same A/C + battery gate and brick warning; reboot to take effect. **Untested on hardware.**
 
+All the flash items are **disabled unless the PC110 was booted from a floppy** — the BIOS-flash 12 V
+(VPP) is only powered under a floppy boot in an IBM-marked drive
+([`Discovery/BIOS-Flash`](https://github.com/ahmadexp/Open-Source-PC110/blob/main/Discovery/BIOS-Flash/readme.md) §7),
+so PS2GUI checks the boot drive and gates them accordingly.
+
 And **Memory: enable / remove 32 MB patch** — two items that reflash a 17-byte POST memory-sizing
 patch so a PC110 with more than the stock 20 MB (e.g. a 16+16 module) cold-boots cleanly, without the
 RC circuit / `DARK2301` of the classic taka hack (it caps the POST memory count at 28 MB; see
