@@ -78,7 +78,13 @@ active-matrix **TFT** (the 18-byte F65535 flat-panel patch; see
 values; **TFT → DSTN** restores that backup, so the round-trip is exact and no hard-coded DSTN table
 is needed. Same A/C + battery gate and brick warning; reboot to take effect. **Untested on hardware.**
 
-All the flash items are **disabled unless the PC110 was booted from a floppy** — the BIOS-flash 12 V
+**Diagnose BIOS patches** is a **read-only** item that reports which BIOS patches the machine has —
+display panel (TFT-patched vs stock DSTN, by matching the 18 flat-panel XR bytes against both known
+tables), the Windows 256-colour fix, and the 32 MB memory patch, with the raw bytes. It only reads the
+`C000`/`F000` shadows, so it works from **any** boot device (never gated). Hardware-verified on a stock
+DSTN PC110.
+
+All the *flash* items are **disabled unless the PC110 was booted from a floppy** — the BIOS-flash 12 V
 (VPP) is only powered under a floppy boot in an IBM-marked drive
 ([`Discovery/BIOS-Flash`](https://github.com/ahmadexp/Open-Source-PC110/blob/main/Discovery/BIOS-Flash/readme.md) §7),
 so PS2GUI checks the boot drive and gates them accordingly.

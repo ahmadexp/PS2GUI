@@ -2843,6 +2843,130 @@ flash_bios:
 ;  Runs with interrupts disabled and makes NO int / BIOS calls.
 ; ----------------------------------------------------------------------------
 ; ----------------------------------------------------------------------------
+;  diag_patch : READ-ONLY report of which BIOS patches are present.
+;  Reads the C000 video-BIOS shadow and the F000 system-BIOS shadow only --
+;  no port I/O, no flash commands -- safe from ANY boot device, no floppy/VPP
+;  needed (hence R_CALL, not R_FCALL).
+; ----------------------------------------------------------------------------
+diag_patch:
+        mov     si, msg_dgt
+        call    dump_header
+        mov     ax, 0xC000
+        mov     es, ax
+        xor     bl, bl
+        xor     bh, bh
+        xor     si, si
+.cnt:   mov     di, si
+        add     di, di
+        mov     di, [cs:tft_off+di]
+        mov     al, [es:di]
+        cmp     al, [cs:tft_val+si]
+        jne     .n1
+        inc     bl
+.n1:    cmp     al, [cs:dstn_val+si]
+        jne     .n2
+        inc     bh
+.n2:    inc     si
+        cmp     si, NPANEL
+        jb      .cnt
+        mov     [dg_nt], bl
+        mov     [dg_nd], bh
+        mov     al, [es:0x01CB]
+        mov     [dg_1cb], al
+        mov     dh, 2
+        mov     dl, 0
+        call    gotoxy
+        mov     si, msg_dgpan
+        call    puts_tty
+        mov     al, [dg_nt]
+        cmp     al, NPANEL
+        jne     .nt
+        mov     si, msg_dgtft
+        jmp     .pp
+.nt:    mov     al, [dg_nd]
+        cmp     al, NPANEL
+        jne     .mix
+        mov     si, msg_dgdstn
+        jmp     .pp
+.mix:   mov     si, msg_dgmix
+.pp:    call    puts_tty
+        mov     si, msg_dgmt
+        call    puts_tty
+        mov     al, [dg_nt]
+        call    print_dec_al
+        mov     si, msg_dgmt2
+        call    puts_tty
+        mov     al, [dg_nd]
+        call    print_dec_al
+        mov     si, msg_dg18
+        call    puts_tty
+        mov     dh, 4
+        mov     dl, 0
+        call    gotoxy
+        mov     si, msg_dgw
+        call    puts_tty
+        mov     al, [dg_1cb]
+        cmp     al, 0x1F
+        jne     .wabs
+        mov     si, msg_dgpres
+        jmp     .wp
+.wabs:  mov     si, msg_dgabs
+.wp:    call    puts_tty
+        mov     si, msg_dgby
+        call    puts_tty
+        mov     al, [dg_1cb]
+        call    print_hex_al
+        mov     si, msg_dgcp
+        call    puts_tty
+        mov     ax, 0xF000
+        mov     es, ax
+        mov     dh, 6
+        mov     dl, 0
+        call    gotoxy
+        mov     si, msg_dgm
+        call    puts_tty
+        cmp     byte [es:MEM_HOOK], 0xE9
+        jne     .mstock
+        cmp     byte [es:MEM_HOOK+1], 0x36
+        jne     .munk
+        cmp     byte [es:MEM_HOOK+2], 0xC5
+        jne     .munk
+        mov     si, msg_dgpres
+        jmp     .mp
+.mstock:
+        cmp     byte [es:MEM_HOOK], 0x83
+        jne     .munk
+        cmp     byte [es:MEM_HOOK+1], 0xC3
+        jne     .munk
+        cmp     byte [es:MEM_HOOK+2], 0x40
+        jne     .munk
+        mov     si, msg_dgabs
+        jmp     .mp
+.munk:  mov     si, msg_dgmix
+.mp:    call    puts_tty
+        mov     si, msg_dgby
+        call    puts_tty
+        mov     al, [es:MEM_HOOK]
+        call    print_hex_al
+        mov     al, ' '
+        call    putc_tty
+        mov     al, [es:MEM_HOOK+1]
+        call    print_hex_al
+        mov     al, ' '
+        call    putc_tty
+        mov     al, [es:MEM_HOOK+2]
+        call    print_hex_al
+        mov     si, msg_dgcp
+        call    puts_tty
+        mov     dh, 10
+        mov     dl, 0
+        call    gotoxy
+        mov     si, msg_donekey
+        call    puts_hint
+        call    getkey
+        ret
+
+; ----------------------------------------------------------------------------
 ;  DSTN <-> TFT panel conversion (video-BIOS patch, auto-reversible).
 ;  DSTN->TFT applies the 18 F65535 flat-panel XR writes (== vpatch), saving the
 ;  machine's own pre-patch bytes to C:\PANEL.SAV first; TFT->DSTN restores them.
@@ -6517,6 +6641,20 @@ cf_title   db "Run this command?",0
 cf_prompt  db "Press Y to run, N to cancel",0
 msg_running db "Running: ",0
 msg_donekey db "--- done.  Press any key to return to PS2TUI ---",0
+msg_dgt   db "BIOS patch status (read-only)",0
+msg_dgpan db "Display panel  : ",0
+msg_dgtft db "TFT (patched)",0
+msg_dgdstn db "DSTN (stock)",0
+msg_dgmix db "MIXED / unknown revision",0
+msg_dgmt  db "    match TFT ",0
+msg_dgmt2 db "/18  DSTN ",0
+msg_dg18  db "/18",0
+msg_dgw   db "Win 256-colour : ",0
+msg_dgm   db "32 MB mem patch: ",0
+msg_dgpres db "PRESENT",0
+msg_dgabs db "absent",0
+msg_dgby  db "    (bytes: ",0
+msg_dgcp  db ")",0
 msg_needfd1 db "Flashing is disabled",0
 msg_needfd2 db "The BIOS flash 12V (VPP) is only powered when you boot from a",13,10
             db "floppy in an IBM-marked floppy drive. These items are disabled",13,10
@@ -6591,6 +6729,7 @@ rows:                     ; pure items, grouped by category (no header rows)
   ROW l_pdstn,  panel_dstn, 0, R_FCALL
   ROW l_m32on,  mem32_on,   0, R_FCALL
   ROW l_m32off, mem32_off,  0, R_FCALL
+  ROW l_dgnose, diag_patch, 0, R_CALL
   ; -- System Test (38..45) --
   ROW l_tmem,   test_mem,   0, R_CALL
   ROW l_tvid,   test_vid,   0, R_CALL
@@ -6628,11 +6767,11 @@ cats:
   CAT c_dev,    d_dev,    10, 9    ; 2 Devices
   CAT c_kbd,    d_kbd,    19, 5    ; 3 Keyboard & Pointer
   CAT c_adv,    d_adv,    24, 10   ; 4 Advanced
-  CAT c_dump,   d_dump,   34, 9    ; 5 Dumps & ROM
-  CAT c_test,   d_test,   43, 8    ; 6 System Test
-  CAT c_diag,   d_diag,   51, 5    ; 7 Diagnostics
-  CAT c_backup, d_backup, 56, 2    ; 8 Backup & Restore
-  CAT c_info,   d_info,   58, 6    ; 9 Information
+  CAT c_dump,   d_dump,   34, 10   ; 5 Dumps & ROM
+  CAT c_test,   d_test,   44, 8    ; 6 System Test
+  CAT c_diag,   d_diag,   52, 5    ; 7 Diagnostics
+  CAT c_backup, d_backup, 57, 2    ; 8 Backup & Restore
+  CAT c_info,   d_info,   59, 6    ; 9 Information
 cats_end:
 NCATS equ (cats_end-cats)/6
 
@@ -6710,6 +6849,7 @@ l_ptft   db "Display: DSTN -> TFT  (!)",0
 l_pdstn  db "Display: TFT -> DSTN  (restore)",0
 l_m32on  db "Memory: enable 32 MB patch  (!)",0
 l_m32off db "Memory: remove 32 MB patch  (restore)",0
+l_dgnose db "Diagnose BIOS patches  (read-only)",0
 l_tmem   db "Memory info + RAM test",0
 l_tvid   db "Video / colour test",0
 l_tkbd   db "Keyboard test",0
@@ -6802,6 +6942,12 @@ tft_off   dw 0x01CB,0x0A9A,0x0A9C,0x0AA0,0x0AA4,0x0AA6,0x0AB4,0x0AB8,0x0AE6
           dw 0x0AE8,0x0AEA,0x0AF6,0x0AF7,0x0AFA,0x0AFC,0x0AFE,0x0B00,0x0B04
 tft_val   db 0x1F,0x42,0xC0,0xC5,0xC4,0xC0,0x1C,0x00,0x56
           db 0x13,0x5F,0x00,0x0C,0x01,0x26,0xDF,0x05,0x00
+; stock DSTN values, captured live from an unmodified DSTN PC110 (2026-07-27)
+dstn_val  db 0x0C,0x44,0xC2,0x04,0x63,0x3A,0x18,0x1B,0x57
+          db 0x19,0x59,0x15,0x53,0xE4,0x07,0xE0,0x01,0x1B
+dg_nt     db 0
+dg_nd     db 0
+dg_1cb    db 0
 panel_sav db 18 dup(0)                     ; captured pre-patch (DSTN) originals
 ; 32 MB memory count-cap patch (F-lower half); both directions known exactly
 mem_hook_patch db 0xE9,0x36,0xC5           ; jmp 0x25CE (over the count loop)
